@@ -1,7 +1,35 @@
 <?php
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/header.php'; 
 
 $ticket_code = isset($_GET['code']) ? trim($_GET['code']) : '';
+$redirect_action = isset($_GET['redirect']) ? trim($_GET['redirect']) : '';
+$validation_result = null;
+
+// If redirected from the public lookup, go straight to view
+if (!empty($ticket_code) && $redirect_action === 'view') {
+    // Look up the ticket by code
+    $lookupQuery = "
+        SELECT t.ticket_id 
+        FROM Ticket t 
+        WHERE t.ticket_code = '" . mysqli_real_escape_string($conn, $ticket_code) . "'
+    ";
+    $lookupResult = mysqli_query($conn, $lookupQuery);
+    
+    if ($lookupResult && mysqli_num_rows($lookupResult) > 0) {
+        $ticket = mysqli_fetch_assoc($lookupResult);
+        // Redirect to ticket view page
+        header('Location: /event-ticketing-v2/modules/tickets/view.php?id=' . $ticket['ticket_id'] . '&public=1');
+        exit;
+    } else {
+        // Ticket not found - show error on this page
+        $validation_result = [
+            'success' => false,
+            'message' => 'Invalid ticket code. Ticket not found.'
+        ];
+    }
+}
+
+// ... rest of the existing validate.php code continues below
 $validation_result = null;
 
 if (!empty($ticket_code)) {

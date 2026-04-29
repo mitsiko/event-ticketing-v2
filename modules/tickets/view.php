@@ -1,3 +1,49 @@
+<?php 
+require_once __DIR__ . '/../../includes/header.php';
+
+$ticket_id = get('id');
+$isPublic = get('public') === '1';
+
+if (!$ticket_id) {
+    redirect('/event-ticketing-v2/modules/tickets/');
+}
+
+// ... rest of existing query and code
+
+// Then in the HTML, adjust the header for public view:
+// After the <div class="page active">, add a conditional header
+
+if ($isPublic): ?>
+<div class="page active">
+    <div class="page-header">
+        <div>
+            <div class="page-title">Your Ticket</div>
+            <div class="page-sub">View your ticket details and QR code</div>
+        </div>
+        <div>
+            <button class="btn btn-primary" onclick="window.print()">🖨 Print Ticket</button>
+            <a href="/event-ticketing-v2/online-reg.php" class="btn">← Back to Events</a>
+        </div>
+    </div>
+    <!-- Show a banner for public users -->
+    <div style="background:#fffdf5;border:1px solid #fde68a;border-radius:4px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#92400e;">
+        💡 <strong>Tip:</strong> Print this ticket or save the QR code. You'll need to present it at the event entrance for validation.
+    </div>
+<?php else: ?>
+<div class="page active">
+    <div class="page-header">
+        <div>
+            <div class="page-title">Ticket Details</div>
+            <div class="page-sub">View ticket information and QR code</div>
+        </div>
+        <div>
+            <a href="/event-ticketing-v2/modules/tickets/" class="btn">← Back to Tickets</a>
+            <button class="btn btn-primary" onclick="window.print()">🖨 Print Ticket</button>
+        </div>
+    </div>
+<?php endif; ?>
+
+
 <?php require_once __DIR__ . '/../../includes/header.php';
 
 $ticket_id = get('id');

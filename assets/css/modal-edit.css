@@ -1,0 +1,236 @@
+/* ============================================================
+   OVERLAY EDIT MODAL STYLES
+   Clean overlay for inline editing
+   Color Scheme: 60% #fdfbfc, 30% #7e1416, 10% #f9be1b
+   ============================================================ */
+
+.modal-edit-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 300;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    overflow-y: auto;
+}
+
+.modal-edit-overlay.active {
+    opacity: 1;
+}
+
+.modal-edit-container {
+    background: #fdfbfc;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    transform: translateY(20px);
+    transition: transform 0.2s ease;
+    border: 1px solid #e5e5e5;
+}
+
+.modal-edit-overlay.active .modal-edit-container {
+    transform: translateY(0);
+}
+
+.modal-edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid #e5e5e5;
+    background: #f8f5f6;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.modal-edit-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #7e1416;
+    font-family: 'Inter', serif;
+}
+
+.modal-edit-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #525252;
+    padding: 2px 8px;
+    border-radius: 3px;
+    line-height: 1;
+    transition: all 0.15s ease;
+}
+
+.modal-edit-close:hover {
+    background: #f3f0f1;
+    color: #7e1416;
+}
+
+.modal-edit-body {
+    padding: 18px;
+}
+
+.modal-edit-loading {
+    text-align: center;
+    padding: 40px;
+    color: #525252;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e5e5;
+    border-top-color: #7e1416;
+    border-radius: 50%;
+    animation: modalSpin 0.8s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes modalSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Form elements inside modal */
+.modal-edit-body .card {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+.modal-edit-body .card form {
+    padding: 0;
+}
+
+.modal-edit-body .form-group {
+    margin-bottom: 14px;
+}
+
+.modal-edit-body .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #525252;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.modal-edit-body input[type="text"],
+.modal-edit-body input[type="number"],
+.modal-edit-body input[type="email"],
+.modal-edit-body input[type="date"],
+.modal-edit-body select,
+.modal-edit-body textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    background: #fdfbfc;
+    color: #1a1a1a;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+
+.modal-edit-body input:focus,
+.modal-edit-body select:focus,
+.modal-edit-body textarea:focus {
+    outline: none;
+    border-color: #7e1416;
+    box-shadow: 0 0 0 2px rgba(126, 20, 22, 0.08);
+}
+
+.modal-edit-body .btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid #e5e5e5;
+    background: #fdfbfc;
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: center;
+}
+
+.modal-edit-body .btn:hover {
+    border-color: #9a1a1d;
+    color: #7e1416;
+}
+
+.modal-edit-body .btn-primary {
+    background: #7e1416;
+    color: white;
+    border-color: #7e1416;
+}
+
+.modal-edit-body .btn-primary:hover {
+    background: #5c0e10;
+    border-color: #5c0e10;
+    color: white;
+}
+
+.modal-edit-body .alert {
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border-left: 3px solid;
+}
+
+.modal-edit-body .alert-error {
+    background: #fef2f2;
+    border-left-color: #dc2626;
+    color: #991b1b;
+}
+
+.modal-edit-body .alert-error ul {
+    margin: 4px 0 0 16px;
+    padding: 0;
+}
+
+.modal-edit-body .alert-error li {
+    margin-bottom: 2px;
+}
+
+/* Error state */
+.modal-edit-body .error-text {
+    color: #dc2626;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .modal-edit-overlay {
+        padding: 20px 10px;
+    }
+    
+    .modal-edit-container {
+        max-width: 100%;
+        max-height: 90vh;
+    }
+    
+    .modal-edit-body {
+        padding: 14px;
+    }
+}

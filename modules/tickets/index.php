@@ -37,7 +37,7 @@ $query = "SELECT t.*, a.first_name, a.last_name, a.attendee_type,
 
 if (!empty($search)) {
     $search_escaped = mysqli_real_escape_string($conn, $search);
-    $query .= " AND (t.ticket_code LIKE '%$search_escaped%' OR CONCAT(a.first_name, ' ', a.last_name) LIKE '%$search_escaped%')";
+    $query .= " AND (t.ticket_code LIKE '%$search_escaped%' OR CONCAT(a.first_name, ' ', a.last_name) LIKE '%$search_escaped%' OR e.event_name LIKE '%$search_escaped%')";
 }
 
 if (!empty($payment_filter)) {
@@ -67,7 +67,7 @@ if (!$tickets) {
 
     <div class="search-row">
         <form method="GET" id="filter-form" style="display:flex;gap:8px;width:100%">
-            <input type="text" name="search" placeholder="Search code or attendee..." value="<?php echo htmlspecialchars($search); ?>" style="flex:1;max-width:280px">
+            <input type="text" name="search" placeholder="Search attendee or event..." value="<?php echo htmlspecialchars($search); ?>" style="flex:1;max-width:280px">
             <select name="payment" id="payment-select" style="width:140px">
                 <option value="">All Payment</option>
                 <option value="free" <?php echo $payment_filter == 'free' ? 'selected' : ''; ?>>Free</option>
@@ -84,9 +84,9 @@ if (!$tickets) {
             <table>
                 <thead>
                     <tr>
-                        <th>Ticket Code</th>
                         <th>Attendee</th>
                         <th>Event / Category</th>
+                        <th>Price</th>
                         <th>Payment</th>
                         <th>Validated</th>
                         <th>Actions</th>
@@ -96,7 +96,6 @@ if (!$tickets) {
                     <?php if ($tickets && mysqli_num_rows($tickets) > 0): ?>
                         <?php while ($ticket = mysqli_fetch_assoc($tickets)): ?>
                             <tr>
-                                <td><code style="font-size:11px;word-break:break-all"><?php echo htmlspecialchars(substr($ticket['ticket_code'], 0, 30)); ?>...</code></td>
                                 <td>
                                     <div style="font-weight:500"><?php echo htmlspecialchars($ticket['first_name'] . ' ' . $ticket['last_name']); ?></div>
                                     <div style="margin-top:2px">
@@ -108,6 +107,9 @@ if (!$tickets) {
                                 <td>
                                     <div style="font-size:12px"><?php echo htmlspecialchars($ticket['event_name']); ?></div>
                                     <div style="font-size:11px;color:var(--color-text-secondary)"><?php echo htmlspecialchars($ticket['category_name']); ?></div>
+                                </td>
+                                <td>
+                                    <?php echo $ticket['price'] > 0 ? '₱' . number_format($ticket['price'], 2) : '<span class="badge b-green">Free</span>'; ?>
                                 </td>
                                 <td><span class="badge <?php echo getPaymentBadge($ticket['payment_status']); ?>"><?php echo ucfirst(htmlspecialchars($ticket['payment_status'])); ?></span></td>
                                 <td>
@@ -127,7 +129,7 @@ if (!$tickets) {
                                         <?php if (!$ticket['is_validated']): ?>
                                             <a href="/event-ticketing-v2/modules/tickets/validate.php?code=<?php echo $ticket['ticket_code']; ?>" class="btn btn-sm btn-success">Validate</a>
                                         <?php endif; ?>
-                                        <a href="/event-ticketing-2/modules/tickets/?delete=<?php echo $ticket['ticket_id']; ?>" 
+                                        <a href="/event-ticketing-v2/modules/tickets/?delete=<?php echo $ticket['ticket_id']; ?>" 
                                            class="btn btn-sm btn-danger" 
                                            onclick="return confirm('Are you sure you want to delete this ticket? The slot will be restored.')">Del</a>
                                     </div>

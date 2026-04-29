@@ -82,7 +82,7 @@
 }
 
 .header-brand .back-link {
-    color: rgba(255,255,255,0.85);
+ 
     text-decoration: none;
     font-size: 13px;
     font-weight: 500;
@@ -109,7 +109,7 @@
 }
 
 .header-brand h1 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Anton', serif;
     font-size: 22px;
     margin: 0;
     letter-spacing: -0.3px;
@@ -133,7 +133,6 @@
     padding: 6px 14px;
     background: rgba(255,255,255,0.08);
     color: white;
-    border: 1px solid rgba(255,255,255,0.2);
     border-radius: var(--user-radius-xs);
     text-decoration: none;
     font-size: 12px;
@@ -174,7 +173,7 @@
     font-size: 24px;
     font-weight: 700;
     color: var(--user-primary);
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
 }
 
 .stat-label {
@@ -189,7 +188,7 @@
 
 /* === SEARCH SECTION === */
 .search-section {
-    padding: 8px 0 16px;
+    padding: 24px 0px 16px;
 }
 
 .search-form {
@@ -300,11 +299,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-top: 20px;
     margin-bottom: 20px;
 }
 
 .events-header h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
     font-size: 20px;
     margin: 0;
     color: var(--user-primary);
@@ -403,7 +403,7 @@
 }
 
 .event-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
     font-size: 18px;
     margin: 0 0 10px 0;
     color: var(--user-primary);
@@ -581,7 +581,7 @@
 }
 
 .event-summary-header h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
     font-size: 20px;
     margin: 6px 0 0;
     color: var(--user-primary);
@@ -984,7 +984,6 @@
     padding: 11px 22px;
     background: transparent;
     color: var(--user-primary);
-    border: 1px solid var(--user-primary);
     border-radius: var(--user-radius-xs);
     font-size: 14px;
     font-weight: 500;
@@ -1037,10 +1036,12 @@
 .success-icon { font-size: 60px; margin-bottom: 12px; }
 
 .success-screen h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
     font-size: 24px;
     color: var(--user-primary);
     margin: 0 0 6px;
+    padding-top:24px;
+
 }
 
 .success-message {
@@ -1071,7 +1072,7 @@
 .ticket-preview-header h3 {
     margin: 0 0 4px;
     font-size: 17px;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', serif;
 }
 
 .ticket-preview-header p {
@@ -1281,4 +1282,145 @@
     .ticket-preview, .ticket-preview * { visibility: visible; }
     .ticket-preview { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: 1px solid #000; }
     .success-actions, .success-note, .user-header, .user-footer, .btn-copy { display: none !important; }
+}
+
+
+/* === WELCOME SECTION === */
+.welcome-section {
+    padding: 28px 0 20px;
+}
+
+
+.welcome-content {
+    display: flex;              /* REQUIRED */
+    flex-direction: column;     /* stack vertically */
+    align-items: center;        /* horizontal center */
+
+
+    border-radius: var(--user-radius);
+    padding: 24px 28px;
+    text-align: center;
+}
+
+.welcome-content h2 {
+    font-family: 'Inter', serif;
+    font-size: 24px;
+    color: var(--user-primary);
+    margin: 0 0 8px;
+}
+
+.welcome-content p {
+    font-size: 14px;
+    color: var(--user-text-secondary);
+    max-width: 650px;
+    margin: 0 auto 16px;
+    line-height: 1.6;
+}
+
+.welcome-highlights {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.highlight-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--user-primary);
+    font-weight: 600;
+}
+
+.highlight-icon {
+    font-size: 18px;
+}
+
+/* === FILTER COUNT BADGE === */
+.filter-count {
+    font-size: 11px;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* === MODAL === */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.lookup-card {
+    background: var(--user-card-bg);
+    border: 1px solid var(--user-border);
+    border-radius: var(--user-radius);
+    padding: 24px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.lookup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.lookup-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--user-primary);
+    font-family: 'Inter', serif;
+}
+
+.lookup-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--user-text-muted);
+    padding: 0 6px;
+    line-height: 1;
+}
+
+.lookup-close:hover {
+    color: var(--user-primary);
+}
+
+.lookup-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--user-border);
+    border-radius: var(--user-radius-xs);
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.lookup-input:focus {
+    outline: none;
+    border-color: var(--user-primary);
+    box-shadow: 0 0 0 2px rgba(126, 20, 22, 0.08);
+}
+
+/* Responsive Welcome Section */
+@media (max-width: 768px) {
+    .welcome-content {
+        padding: 18px;
+    }
+    .welcome-highlights {
+        gap: 16px;
+    }
+    .welcome-content h2 {
+        font-size: 20px;
+    }
 }

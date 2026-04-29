@@ -5,9 +5,9 @@
 (function() {
     'use strict';
     
-    // Track if modal is open
     let modalOpen = false;
     let currentModal = null;
+    let currentOnSuccess = null;
     
     /**
      * Create and show an edit modal
@@ -16,26 +16,33 @@
      * @param {function} onSuccess - Callback when edit is successful
      */
     function openEditModal(url, title, onSuccess) {
-        if (modalOpen) return;
+        if (modalOpen) {
+            closeEditModal();
+            setTimeout(function() {
+                openEditModal(url, title, onSuccess);
+            }, 250);
+            return;
+        }
+        
         modalOpen = true;
+        currentOnSuccess = onSuccess || null;
         
         // Create overlay
-        const overlay = document.createElement('div');
+        var overlay = document.createElement('div');
         overlay.className = 'modal-edit-overlay';
-        overlay.innerHTML = `
-            <div class="modal-edit-container">
-                <div class="modal-edit-header">
-                    <h3>${title}</h3>
-                    <button class="modal-edit-close" onclick="closeEditModal()">&times;</button>
-                </div>
-                <div class="modal-edit-body">
-                    <div class="modal-edit-loading">
-                        <div class="loading-spinner"></div>
-                        <p>Loading...</p>
-                    </div>
-                </div>
-            </div>
-        `;
+        overlay.innerHTML = 
+            '<div class="modal-edit-container">' +
+                '<div class="modal-edit-header">' +
+                    '<h3>' + escapeHTML(title) + '</h3>' +
+                    '<button class="modal-edit-close" onclick="closeEditModal()">&times;</button>' +
+                '</div>' +
+                '<div class="modal-edit-body">' +
+                    '<div class="modal-edit-loading">' +
+                        '<div class="loading-spinner"></div>' +
+                        '<p>Loading...</p>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
         
         document.body.appendChild(overlay);
         currentModal = overlay;
@@ -44,81 +51,12 @@
         document.body.style.overflow = 'hidden';
         
         // Animate in
-        requestAnimationFrame(() => {
+        requestAnimationFrame(function() {
             overlay.classList.add('active');
         });
         
-        // Load content via fetch
-        fetch(url)
-            .then(response => {
-                if (!response.ok) throw new Error('Failed to load');
-                return response.text();
-            })
-            .then(html => {
-                const body = overlay.querySelector('.modal-edit-body');
-                
-                // Extract the form portion from the HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Find the main form content
-                const formContent = doc.querySelector('.registration-form, .card form, form[method="POST"]');
-                const pageContent = doc.querySelector('.page.active, .registration-form-wrapper');
-                
-                let content = '';
-                if (formContent) {
-                    content = formContent.outerHTML;
-                } else if (pageContent) {
-                    content = pageContent.innerHTML;
-                } else {
-                    content = '<p>Could not load edit form.</p>';
-                }
-                
-                body.innerHTML = content;
-                
-                // Fix form action to submit via AJAX
-                const form = body.querySelector('form');
-                if (form) {
-                    form.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        submitEditForm(form, url, onSuccess);
-                    });
-                    
-                    // Fix Cancel button to close modal
-                    const cancelBtn = form.querySelector('a.btn:not(.btn-primary), a[href*="cancel"], .btn-secondary');
-                    if (cancelBtn) {
-                        cancelBtn.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            closeEditModal();
-                        });
-                    }
-                }
-                
-                // Fix any hrefs in the modal
-                body.querySelectorAll('a[href]').forEach(link => {
-                    if (link.getAttribute('href').includes('cancel') || 
-                        link.textContent.trim().toLowerCase() === 'cancel' ||
-                        link.classList.contains('btn-secondary')) {
-                        link.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            closeEditModal();
-                        });
-                    }
-                });
-                
-                // Initialize any scripts
-                if (typeof toggleAffiliationFields === 'function') toggleAffiliationFields();
-                if (typeof togglePaymentFields === 'function') togglePaymentFields();
-            })
-            .catch(error => {
-                overlay.querySelector('.modal-edit-body').innerHTML = `
-                    <div style="text-align:center;padding:40px;color:#dc2626;">
-                        <p>Error loading form. Please try again.</p>
-                        <button class="btn btn-sm" onclick="closeEditModal()">Close</button>
-                    </div>
-                `;
-                console.error('Modal load error:', error);
-            });
+        // Load content
+        loadModalContent(url, overlay);
         
         // Close on overlay click
         overlay.addEventListener('click', function(e) {
@@ -131,72 +69,209 @@
         document.addEventListener('keydown', handleEscape);
     }
     
-    function submitEditForm(form, url, onSuccess) {
-        const submitBtn = form.querySelector('button[type="submit"]');
+    function loadModalContent(url, overlay) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 400) {
+                var html = xhr.responseText;
+                var body = overlay.querySelector('.modal-edit-body');
+                
+                // Parse the HTML to extract just the form
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                
+                // Try to find the form or card content
+                var form = tempDiv.querySelector('form[method="POST"]');
+                var card = tempDiv.querySelector('.card form');
+                var pageContent = tempDiv.querySelector('.page.active');
+                
+                if (card) {
+                    body.innerHTML = card.outerHTML;
+                } else if (form && form.closest('.card')) {
+                    body.innerHTML = form.closest('.card').outerHTML;
+                } else if (form) {
+                    body.innerHTML = form.outerHTML;
+                } else if (pageContent) {
+                    // Extract just the form part from the page
+                    var pageForm = pageContent.querySelector('form');
+                    if (pageForm) {
+                        body.innerHTML = pageForm.outerHTML;
+                    } else {
+                        body.innerHTML = '<p style="text-align:center;padding:20px;color:#991b1b;">Could not load edit form.</p>';
+                    }
+                } else {
+                    body.innerHTML = '<p style="text-align:center;padding:20px;color:#991b1b;">Could not load edit form.</p>';
+                }
+                
+                // Remove any alert-success messages (they're from the session flash)
+                var alerts = body.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    if (alert.classList.contains('alert-success') || alert.textContent.indexOf('successfully') !== -1) {
+                        alert.remove();
+                    }
+                });
+                
+                // Fix the form to submit via AJAX
+                var modalForm = body.querySelector('form');
+                if (modalForm) {
+                    modalForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        submitModalForm(modalForm, url, overlay);
+                    });
+                    
+                    // Fix Cancel/Back links to close modal instead
+                    var cancelLinks = modalForm.querySelectorAll('a[href]:not(.btn-primary)');
+                    cancelLinks.forEach(function(link) {
+                        if (link.textContent.trim().toLowerCase().indexOf('cancel') !== -1 ||
+                            link.textContent.trim().toLowerCase().indexOf('back') !== -1 ||
+                            link.classList.contains('btn-secondary')) {
+                            link.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                closeEditModal();
+                            });
+                        }
+                    });
+                    
+                    // Fix buttons that say Cancel
+                    var cancelBtns = modalForm.querySelectorAll('button:not([type="submit"])');
+                    cancelBtns.forEach(function(btn) {
+                        if (btn.textContent.trim().toLowerCase() === 'cancel') {
+                            btn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                closeEditModal();
+                            });
+                        }
+                    });
+                }
+                
+                // Initialize any scripts needed
+                initFormScripts(body);
+                
+            } else {
+                overlay.querySelector('.modal-edit-body').innerHTML = 
+                    '<div style="text-align:center;padding:40px;color:#991b1b;">' +
+                        '<p>Error loading form (Status: ' + xhr.status + ').</p>' +
+                        '<button class="btn btn-sm" onclick="closeEditModal()" style="margin-top:12px;">Close</button>' +
+                    '</div>';
+            }
+        };
+        
+        xhr.onerror = function() {
+            overlay.querySelector('.modal-edit-body').innerHTML = 
+                '<div style="text-align:center;padding:40px;color:#991b1b;">' +
+                    '<p>Network error. Please try again.</p>' +
+                    '<button class="btn btn-sm" onclick="closeEditModal()" style="margin-top:12px;">Close</button>' +
+                '</div>';
+        };
+        
+        xhr.send();
+    }
+    
+    function submitModalForm(form, url, overlay) {
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var originalText = submitBtn ? submitBtn.textContent : 'Save';
+        
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Saving...';
         }
         
-        const formData = new FormData(form);
+        // Remove old errors
+        var oldErrors = form.querySelector('.alert-error, .error-box');
+        if (oldErrors) oldErrors.remove();
         
-        fetch(url, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.text())
-        .then(html => {
-            // Check if the response contains a success message
-            if (html.includes('successfully') || html.includes('alert-success')) {
-                closeEditModal();
-                if (typeof onSuccess === 'function') {
-                    onSuccess();
+        var formData = new FormData(form);
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 400) {
+                var html = xhr.responseText;
+                
+                // Check if the response indicates success
+                // Look for success message or redirect
+                if (html.indexOf('successfully') !== -1 || 
+                    html.indexOf('alert-success') !== -1 ||
+                    html.indexOf('Location:') !== -1) {
+                    
+                    // Success! Close modal and reload
+                    closeEditModal();
+                    
+                    if (typeof currentOnSuccess === 'function') {
+                        currentOnSuccess();
+                    } else {
+                        // Reload the page to show updated data
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 300);
+                    }
                 } else {
-                    // Reload the page to show updated data
-                    window.location.reload();
+                    // Show errors - parse the response for error messages
+                    var tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    
+                    var errorBox = tempDiv.querySelector('.alert-error, .error-box');
+                    
+                    if (errorBox) {
+                        // Insert errors at top of form
+                        form.insertBefore(errorBox, form.firstChild);
+                        errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                        // No errors found but also no success - might need to update form
+                        var newForm = tempDiv.querySelector('form');
+                        if (newForm) {
+                            form.innerHTML = newForm.innerHTML;
+                            // Re-attach submit handler
+                            form.addEventListener('submit', function(e) {
+                                e.preventDefault();
+                                submitModalForm(form, url, overlay);
+                            });
+                        }
+                    }
                 }
             } else {
-                // Show errors - parse the response
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const errors = doc.querySelector('.alert-error, .error-box');
-                const formContent = doc.querySelector('.registration-form, .card form, form[method="POST"]');
-                
-                if (errors) {
-                    // Show errors above the form
-                    const existingErrors = form.querySelector('.alert-error, .error-box');
-                    if (existingErrors) existingErrors.remove();
-                    form.insertBefore(errors, form.firstChild);
-                } else if (formContent) {
-                    // Update the form content
-                    const body = currentModal.querySelector('.modal-edit-body');
-                    body.innerHTML = formContent.outerHTML || formContent.innerHTML;
-                }
+                var errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-error';
+                errorDiv.textContent = 'Server error (Status: ' + xhr.status + '). Please try again.';
+                form.insertBefore(errorDiv, form.firstChild);
             }
             
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Changes';
+                submitBtn.textContent = originalText;
             }
-        })
-        .catch(error => {
-            console.error('Form submit error:', error);
+        };
+        
+        xhr.onerror = function() {
+            var errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-error';
+            errorDiv.textContent = 'Network error. Please check your connection.';
+            form.insertBefore(errorDiv, form.firstChild);
+            
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Changes';
+                submitBtn.textContent = originalText;
             }
-        });
+        };
+        
+        xhr.send(formData);
     }
     
     function closeEditModal() {
         if (currentModal) {
             currentModal.classList.remove('active');
-            setTimeout(() => {
+            setTimeout(function() {
                 if (currentModal && currentModal.parentNode) {
                     currentModal.parentNode.removeChild(currentModal);
                 }
                 currentModal = null;
                 modalOpen = false;
+                currentOnSuccess = null;
                 document.body.style.overflow = '';
             }, 200);
         }
@@ -209,8 +284,32 @@
         }
     }
     
+    function escapeHTML(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+    
+    function initFormScripts(container) {
+        // Initialize any toggle functions that might be needed
+        var selects = container.querySelectorAll('select[onchange]');
+        selects.forEach(function(select) {
+            var attr = select.getAttribute('onchange');
+            if (attr) {
+                select.addEventListener('change', function() {
+                    try {
+                        eval(attr);
+                    } catch(e) {}
+                });
+            }
+        });
+    }
+    
     // Expose to global scope
     window.openEditModal = openEditModal;
     window.closeEditModal = closeEditModal;
+    
+    // Log that modal system is ready
+    console.log('✅ Modal edit system loaded');
     
 })();

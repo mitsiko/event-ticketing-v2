@@ -84,8 +84,4 @@ $venues = mysqli_query($conn, "SELECT * FROM Venue ORDER BY venue_name");
     </div>
 </div>
 
-<!-- Load modal scripts -->
-<link rel="stylesheet" href="/event-ticketing-v2/assets/css/modal-edit.css">
-<script src="/event-ticketing-v2/assets/js/modal-edit.js"></script>
-
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

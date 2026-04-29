@@ -54,8 +54,15 @@ if (isPost()) {
                     throw new Exception("Failed to generate ticket UUID: " . $ticket_code);
                 }
                 
-                $payment_status = mysqli_real_escape_string($conn, $_POST['payment_status'] ?? ($cat['price'] > 0 ? 'paid' : 'free'));
-                $payment_method = isset($_POST['payment_method']) ? mysqli_real_escape_string($conn, $_POST['payment_method']) : null;
+                // Determine payment status based on event price
+                $isFreeEvent = $cat['price'] == 0;
+                $payment_status = $isFreeEvent ? 'free' : 'pending';
+                
+                // Payment method only applies to paid events
+                $payment_method = null;
+                if (!$isFreeEvent) {
+                    $payment_method = isset($_POST['payment_method']) ? mysqli_real_escape_string($conn, $_POST['payment_method']) : 'cash';
+                }
                 
                 $ticket_code_escaped = mysqli_real_escape_string($conn, $ticket_code);
                 
@@ -98,7 +105,7 @@ while ($cat = mysqli_fetch_assoc($catQuery)) {
     </div>
 
     <?php if (!empty($errors)): ?>
-        <div class="alert alert-error" style="background:#FCEBEB;border:0.5px solid #E24B4A;color:#791F1F;padding:12px 16px;border-radius:6px;margin-bottom:16px">
+        <div class="alert alert-error">
             <ul style="margin:0;padding-left:20px">
                 <?php foreach ($errors as $error): ?>
                     <li><?php echo h($error); ?></li>
@@ -120,7 +127,7 @@ while ($cat = mysqli_fetch_assoc($catQuery)) {
             </div>
             <div class="form-group">
                 <label class="form-label">Ticket category *</label>
-                <select name="category_id" id="category_select" onchange="checkEligibility()" required>
+                <select name="category_id" id="category_select" onchange="checkEligibility(); updatePaymentOptions();" required>
                     <option value="">-- Select category --</option>
                 </select>
             </div>
@@ -135,25 +142,29 @@ while ($cat = mysqli_fetch_assoc($catQuery)) {
                     <?php endwhile; ?>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label">Payment status *</label>
-                <select name="payment_status" id="payment_status" onchange="togglePaymentMethod()" required>
-                    <option value="">-- Select status --</option>
-                    <option value="paid">Paid</option>
-                    <option value="pending">Pending</option>
-                    <option value="free">Free</option>
-                    <option value="refunded">Refunded</option>
-                </select>
+            
+            <!-- Payment Status (auto-determined, shown for info) -->
+            <div class="form-group" id="payment_status_group">
+                <label class="form-label">Payment Status</label>
+                <input type="text" id="payment_status_display" value="Select a category first" readonly 
+                       style="background:var(--color-bg-tertiary);color:var(--color-text-secondary);">
+                <input type="hidden" name="payment_status" id="payment_status_hidden" value="">
             </div>
-            <div class="form-group" id="payment_method_group" style="display:none">
-                <label class="form-label">Payment method</label>
+            
+            <!-- Payment Method (only for paid events) -->
+            <div class="form-group" id="payment_method_group" style="display:none;">
+                <label class="form-label">Payment Method</label>
                 <select name="payment_method" id="payment_method">
-                    <option value="">-- Select method --</option>
+                    <option value="">Select method</option>
                     <option value="cash">Cash</option>
                     <option value="online">Online Payment</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="gcash">GCash</option>
+                    <option value="maya">Maya</option>
                 </select>
             </div>
-            <div id="eligibility_info" class="info-msg"></div>
+            
+            <div id="eligibility_info" style="font-size:12px;margin-top:8px;"></div>
             <div style="display:flex;gap:8px;margin-top:16px">
                 <button type="submit" class="btn btn-primary">Generate & Issue Ticket</button>
                 <a href="/event-ticketing-v2/modules/tickets/" class="btn">Cancel</a>
@@ -179,11 +190,13 @@ function loadCategories() {
                 option.value = id;
                 option.textContent = cat.category_name + ' — ' + (cat.price > 0 ? '₱' + price : 'Free') + ' (' + cat.slots_remaining + ' left)';
                 option.dataset.eligible = cat.eligible_type;
+                option.dataset.price = cat.price;
                 catSelect.appendChild(option);
             }
         }
     }
     checkEligibility();
+    updatePaymentOptions();
 }
 
 function checkEligibility() {
@@ -202,26 +215,48 @@ function checkEligibility() {
     var attendeeType = attOption.dataset.type;
     
     if (eligibleType === 'all' || eligibleType === attendeeType) {
-        infoDiv.innerHTML = '<span style="color:#27500A">✓ Eligible for this category.</span>';
+        infoDiv.innerHTML = '<span style="color:#166534;">✓ Eligible for this category.</span>';
     } else {
-        infoDiv.innerHTML = '<span style="color:#791F1F">⚠ Eligibility mismatch: category is for ' + eligibleType + 's, but this attendee is a ' + attendeeType + '.</span>';
+        infoDiv.innerHTML = '<span style="color:#991b1b;">⚠ Eligibility mismatch: category is for ' + eligibleType + 's, but this attendee is a ' + attendeeType + '.</span>';
     }
 }
 
-function togglePaymentMethod() {
-    var paymentStatus = document.getElementById('payment_status').value;
+function updatePaymentOptions() {
+    var catSelect = document.getElementById('category_select');
+    var statusDisplay = document.getElementById('payment_status_display');
+    var statusHidden = document.getElementById('payment_status_hidden');
     var methodGroup = document.getElementById('payment_method_group');
     var methodSelect = document.getElementById('payment_method');
     
-    if (paymentStatus === 'paid') {
-        methodGroup.style.display = 'block';
-        methodSelect.required = true;
-    } else {
+    if (!catSelect.value) {
+        statusDisplay.value = 'Select a category first';
+        statusHidden.value = '';
         methodGroup.style.display = 'none';
-        methodSelect.required = false;
+        return;
+    }
+    
+    var selectedOption = catSelect.selectedOptions[0];
+    var price = parseFloat(selectedOption.dataset.price);
+    
+    if (price === 0) {
+        // Free event
+        statusDisplay.value = 'Free';
+        statusHidden.value = 'free';
+        methodGroup.style.display = 'none';
         methodSelect.value = '';
+    } else {
+        // Paid event - defaults to Pending
+        statusDisplay.value = 'Pending (will be set automatically)';
+        statusHidden.value = 'pending';
+        methodGroup.style.display = 'block';
+        if (!methodSelect.value) methodSelect.value = 'cash';
     }
 }
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    updatePaymentOptions();
+});
 </script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

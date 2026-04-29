@@ -14,6 +14,9 @@ if (!$venue) {
     redirect('/event-ticketing-v2/modules/venues/');
 }
 
+// Get proper back URL
+$backUrl = getBackUrl('/event-ticketing-v2/modules/venues/');
+
 if (isPost()) {
     $venue_name = trim($_POST['venue_name'] ?? '');
     $venue_type = trim($_POST['venue_type'] ?? '');
@@ -63,11 +66,11 @@ $form_values = !empty($_POST) ? $_POST : $venue;
             <div class="page-title">Edit Venue</div>
             <div class="page-sub">Update facility information</div>
         </div>
-        <a href="/event-ticketing-v2/modules/venues/" class="btn">← Back to Venues</a>
+        <a href="<?php echo $backUrl; ?>" class="btn">← Back</a>
     </div>
 
     <?php if (!empty($errors)): ?>
-        <div class="alert alert-error" style="background:#FCEBEB;border:0.5px solid #E24B4A;color:#791F1F;padding:12px 16px;border-radius:6px;margin-bottom:16px">
+        <div class="alert alert-error">
             <ul style="margin:0;padding-left:20px">
                 <?php foreach ($errors as $error): ?>
                     <li><?php echo h($error); ?></li>
@@ -115,7 +118,7 @@ $form_values = !empty($_POST) ? $_POST : $venue;
             </div>
             <div style="display:flex;gap:8px;margin-top:16px">
                 <button type="submit" class="btn btn-primary">Update Venue</button>
-                <a href="<?php echo getBackUrl('/event-ticketing-v2/modules/venues/'); ?>" class="btn">Cancel</a>
+                <a href="<?php echo $backUrl; ?>" class="btn">Cancel</a>
             </div>
         </form>
     </div>

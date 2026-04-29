@@ -37,9 +37,8 @@ if (!$isLoggedIn && isPost() && isset($_POST['username']) && isset($_POST['passw
     }
 }
 
-// Current script base name (may be 'index.php' in many directories)
+// Current script base name
 $currentPage = basename($_SERVER['PHP_SELF']);
-// Request path for more accurate matching
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 
 // Get user info safely
@@ -61,7 +60,7 @@ $projectBasePath = '/event-ticketing-v2';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Management & Ticketing — University System</title>
+    <title>UPHSD Molino — Event Management & Ticketing</title>
     <link rel="stylesheet" href="<?php echo $projectBasePath; ?>/assets/css/style.css">
     <style>
         /* Login Screen Styles */
@@ -78,20 +77,28 @@ $projectBasePath = '/event-ticketing-v2';
             border-radius: 6px;
             padding: 2rem;
             width: 100%;
-            max-width: 360px;
+            max-width: 400px;
         }
         .login-logo {
             text-align: center;
             margin-bottom: 1.5rem;
         }
+        .login-logo img {
+            width: 80px;
+            height: auto;
+            margin-bottom: 12px;
+        }
         .login-logo h2 {
-            font-size: 16px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
             margin-top: 8px;
+            color: #7e1416;
+            line-height: 1.4;
         }
         .login-logo p {
             font-size: 12px;
             color: var(--color-text-secondary, #525252);
+            margin-top: 4px;
         }
         #app-screen {
             display: <?php echo $isLoggedIn ? 'block' : 'none'; ?>;
@@ -117,9 +124,9 @@ $projectBasePath = '/event-ticketing-v2';
 <div id="login-screen">
     <div class="login-card">
         <div class="login-logo">
-            <div style="width:48px;height:48px;border-radius:50%;background:#fdf0f1;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:20px">🎓</div>
-            <h2>Event Management &amp; Ticketing</h2>
-            <p>University System — Admin Portal</p>
+            <img src="<?php echo $projectBasePath; ?>/uphsd-logo.png" alt="UPHSD Logo">
+            <h2>University of Perpetual Help System DALTA</h2>
+            <p>Molino Campus — Event Management & Ticketing System</p>
         </div>
         <form method="POST">
             <div class="form-group" style="margin-bottom:10px">
@@ -161,41 +168,51 @@ $projectBasePath = '/event-ticketing-v2';
 
 <nav class="sidebar">
     <div class="sidebar-top">
-        <h1>Event <span style="letter-spacing:0.02em">Ticket</span></h1>
-        <p>University System</p>
+
+        <!-- LEFT: logo -->
+        <div class="logo-wrap">
+            <img src="<?php echo $projectBasePath; ?>/uphsd-logo.png" alt="UPHSD Logo">
+        </div>
+
+        <!-- RIGHT: text (grouped!) -->
+        <div class="sidebar-text">
+            <h1>UPHSD Molino</h1>
+            <p>Event Management<br>& Ticketing</p>
+        </div>
+
     </div>
     <div class="sidebar-user">
         <div class="user-avatar" id="user-avatar"><?php echo $userInitial; ?></div>
         <div style="min-width:0">
             <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="user-name"><?php echo h($userName); ?></div>
-            <div style="font-size:11px;color:var(--color-text-secondary)"><?php echo h($userRole); ?></div>
+            <div style="font-size:11px;color:#c6c0b7"><?php echo h($userRole); ?></div>
         </div>
     </div>
 
     <div class="sidebar-nav">
         <a href="<?php echo $projectBasePath; ?>/index.php" class="nav-item <?php echo (strpos($requestPath, '/index.php') !== false || rtrim($requestPath, '/') === $projectBasePath) ? 'active' : ''; ?>">
-            <span class="nav-icon">📊</span>Dashboard
+            <span class="nav-icon"></span>Dashboard
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/events/" class="nav-item <?php echo strpos($requestPath ?? '', '/modules/events/') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">📅</span>Manage Events
+            <span class="nav-icon"></span>Manage Events
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/venues/" class="nav-item <?php echo strpos($requestPath ?? '', '/modules/venues/') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">🏛️</span>Venues
+            <span class="nav-icon"></span>Venues
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/organizations/" class="nav-item <?php echo strpos($requestPath ?? '', '/modules/organizations/') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">👥</span>Organizations
+            <span class="nav-icon"></span>Organizations
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/categories/" class="nav-item <?php echo strpos($requestPath ?? '', '/modules/categories/') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">🎫</span>Ticket Categories
+            <span class="nav-icon"></span>Ticket Categories
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/attendees/" class="nav-item <?php echo strpos($requestPath ?? '', '/modules/attendees/') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">👤</span>Attendees
+            <span class="nav-icon"></span>Attendees
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/tickets/" class="nav-item <?php echo (strpos($requestPath ?? '', '/modules/tickets/') !== false && strpos($requestPath ?? '', 'validate.php') === false) ? 'active' : ''; ?>">
-            <span class="nav-icon">🎟️</span>Ticket Generation
+            <span class="nav-icon"></span>Ticket Generation
         </a>
         <a href="<?php echo $projectBasePath; ?>/modules/tickets/validate.php" class="nav-item <?php echo strpos($requestPath ?? '', 'validate.php') !== false ? 'active' : ''; ?>">
-            <span class="nav-icon">✓</span>Ticket Validation
+            <span class="nav-icon"></span>Ticket Validation
         </a>
     </div>
 

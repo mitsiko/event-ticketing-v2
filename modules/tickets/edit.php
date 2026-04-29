@@ -1,7 +1,7 @@
 <?php
 /**
  * Edit Ticket
- * Allows editing of ticket payment details and regeneration
+ * Allows editing of ticket payment details
  * With strict payment status transition rules
  */
 require_once __DIR__ . '/../../includes/header.php';
@@ -37,7 +37,7 @@ if (!$ticket) {
 
 // Get the attendee's other tickets for context
 $attendeeTicketsQuery = "
-    SELECT t.*, e.event_name, tc.category_name
+    SELECT t.*, e.event_name, tc.category_name, tc.price
     FROM Ticket t
     JOIN Ticket_Category tc ON t.category_id = tc.category_id
     JOIN Event e ON tc.event_id = e.event_id
@@ -49,28 +49,23 @@ $attendeeTickets = mysqli_query($conn, $attendeeTicketsQuery);
 $errors = [];
 $isFreeEvent = $ticket['price'] == 0;
 $currentStatus = $ticket['payment_status'];
+$updateSuccess = false;
 
 if (isPost()) {
     $payment_status = trim($_POST['payment_status'] ?? $ticket['payment_status']);
     $payment_method = trim($_POST['payment_method'] ?? '');
-    $regenerate_code = isset($_POST['regenerate_code']) && $_POST['regenerate_code'] === '1';
     
     // === STRICT PAYMENT STATUS TRANSITION RULES ===
-    
-    // Define allowed transitions
     $allowedTransitions = [];
     
     if ($isFreeEvent) {
-        // Free events: only allow 'free' status
         $allowedTransitions = ['free'];
         if ($payment_status !== 'free') {
             $errors[] = "This is a free event. Tickets can only have 'Free' payment status.";
         }
     } else {
-        // Paid events: rules depend on current status
         switch ($currentStatus) {
             case 'pending':
-                // Pending → Paid only (NOT Free, NOT Refunded)
                 $allowedTransitions = ['pending', 'paid'];
                 if ($payment_status === 'free') {
                     $errors[] = "Cannot change a pending paid ticket to 'Free'. Mark it as 'Paid' once payment is received.";
@@ -81,7 +76,6 @@ if (isPost()) {
                 break;
                 
             case 'paid':
-                // Paid → Paid or Refunded only (NOT Free, NOT Pending)
                 $allowedTransitions = ['paid', 'refunded'];
                 if ($payment_status === 'free') {
                     $errors[] = "Cannot change a paid ticket to 'Free'. You can mark it as 'Refunded' if needed.";
@@ -92,7 +86,6 @@ if (isPost()) {
                 break;
                 
             case 'refunded':
-                // Refunded → Refunded only (no going back)
                 $allowedTransitions = ['refunded'];
                 if ($payment_status !== 'refunded') {
                     $errors[] = "Refunded tickets cannot be changed to another status.";
@@ -100,7 +93,6 @@ if (isPost()) {
                 break;
                 
             case 'free':
-                // Free → Free only (shouldn't happen for paid events, but just in case)
                 $allowedTransitions = ['free'];
                 if ($payment_status !== 'free') {
                     $errors[] = "Free tickets cannot be changed to a paid status.";
@@ -109,74 +101,38 @@ if (isPost()) {
         }
     }
     
-    // Validate transition
     if (!in_array($payment_status, $allowedTransitions)) {
         $errors[] = "Invalid payment status transition.";
     }
     
-    // Payment method validation
     if ($payment_status === 'paid' && empty($payment_method) && !$isFreeEvent) {
         $errors[] = "Payment method is required for paid tickets.";
     }
     
-    // Regeneration validation
-    if ($regenerate_code && $ticket['is_validated']) {
-        $errors[] = "Cannot regenerate code for an already validated ticket.";
-    }
-    
     if (empty($errors)) {
-        mysqli_begin_transaction($conn);
+        $payment_status_esc = mysqli_real_escape_string($conn, $payment_status);
+        $payment_method_sql = !empty($payment_method) ? "'" . mysqli_real_escape_string($conn, $payment_method) . "'" : "NULL";
         
-        try {
-            $payment_status_esc = mysqli_real_escape_string($conn, $payment_status);
-            $payment_method_sql = !empty($payment_method) ? "'" . mysqli_real_escape_string($conn, $payment_method) . "'" : "NULL";
-            
-            $updateFields = "payment_status = '$payment_status_esc', payment_method = $payment_method_sql";
-            
-            if ($regenerate_code) {
-                $python_script = __DIR__ . '/../../python/generate_uuid.py';
-                if (file_exists($python_script)) {
-                    $new_code = trim(shell_exec("py \"$python_script\" 2>&1"));
-                }
-                
-                if (empty($new_code) || strlen($new_code) < 32) {
-                    $new_code = sprintf(
-                        '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-                        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-                        mt_rand(0, 0xffff),
-                        mt_rand(0, 0x0fff) | 0x4000,
-                        mt_rand(0, 0x3fff) | 0x8000,
-                        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-                    );
-                }
-                
-                $new_code_esc = mysqli_real_escape_string($conn, $new_code);
-                $updateFields .= ", ticket_code = '$new_code_esc'";
-            }
-            
-            $sql = "UPDATE Ticket SET $updateFields WHERE ticket_id = $ticket_id";
-            
-            if (!mysqli_query($conn, $sql)) {
-                throw new Exception("Error updating ticket: " . mysqli_error($conn));
-            }
-            
-            mysqli_commit($conn);
-            
-            // Refresh ticket data
+        $sql = "UPDATE Ticket SET payment_status = '$payment_status_esc', payment_method = $payment_method_sql WHERE ticket_id = $ticket_id";
+        
+        if (mysqli_query($conn, $sql)) {
+            // Refresh ticket data IMMEDIATELY
             $result = mysqli_query($conn, $query);
             $ticket = mysqli_fetch_assoc($result);
             $currentStatus = $ticket['payment_status'];
             
-            $_SESSION['success'] = "Ticket updated successfully." . ($regenerate_code ? " New code generated." : "");
+            // Refresh attendee tickets
+            $attendeeTickets = mysqli_query($conn, $attendeeTicketsQuery);
             
-        } catch (Exception $e) {
-            mysqli_rollback($conn);
-            $errors[] = $e->getMessage();
+            $_SESSION['success'] = "Ticket updated successfully.";
+            $updateSuccess = true;
+        } else {
+            $errors[] = "Error updating ticket: " . mysqli_error($conn);
         }
     }
 }
 
-$formValues = !empty($_POST) ? $_POST : $ticket;
+$formValues = !empty($_POST) && !$updateSuccess ? $_POST : $ticket;
 
 // Build allowed statuses for the dropdown
 function getAllowedStatuses($isFreeEvent, $currentStatus) {
@@ -186,30 +142,15 @@ function getAllowedStatuses($isFreeEvent, $currentStatus) {
     
     switch ($currentStatus) {
         case 'pending':
-            return [
-                'pending' => 'Pending',
-                'paid' => 'Paid'
-            ];
+            return ['pending' => 'Pending', 'paid' => 'Paid'];
         case 'paid':
-            return [
-                'paid' => 'Paid',
-                'refunded' => 'Refunded'
-            ];
+            return ['paid' => 'Paid', 'refunded' => 'Refunded'];
         case 'refunded':
-            return [
-                'refunded' => 'Refunded'
-            ];
+            return ['refunded' => 'Refunded'];
         case 'free':
-            return [
-                'free' => 'Free'
-            ];
+            return ['free' => 'Free'];
         default:
-            return [
-                'free' => 'Free',
-                'paid' => 'Paid',
-                'pending' => 'Pending',
-                'refunded' => 'Refunded'
-            ];
+            return ['free' => 'Free', 'paid' => 'Paid', 'pending' => 'Pending', 'refunded' => 'Refunded'];
     }
 }
 
@@ -232,7 +173,7 @@ if ($ticket['attendee_type'] === 'student') {
     <div class="page-header">
         <div>
             <div class="page-title">Edit Ticket</div>
-            <div class="page-sub">Update ticket payment details or regenerate code</div>
+            <div class="page-sub">Update ticket payment details</div>
         </div>
         <div style="display:flex;gap:8px;">
             <a href="/event-ticketing-v2/modules/tickets/view.php?id=<?php echo $ticket_id; ?>" class="btn">View Ticket</a>
@@ -254,7 +195,7 @@ if ($ticket['attendee_type'] === 'student') {
 
     <!-- Payment Rules Info -->
     <div style="background:var(--color-info-bg);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:16px;">
-        <div style="font-size:12px;font-weight:600;color:#1e40af;margin-bottom:4px;">ℹ️ Payment Status Rules</div>
+        <div style="font-size:12px;font-weight:600;color:#1e40af;margin-bottom:4px;">Payment Status Rules</div>
         <ul style="margin:0;padding-left:18px;font-size:11px;color:#1e40af;">
             <?php if ($isFreeEvent): ?>
                 <li>This is a <strong>free event</strong>. Only 'Free' status is allowed.</li>
@@ -336,11 +277,6 @@ if ($ticket['attendee_type'] === 'student') {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <?php if (count($allowedStatuses) === 1): ?>
-                                    <div style="font-size:10px;color:var(--color-text-muted);margin-top:4px;">
-                                        Only this status is allowed for this ticket.
-                                    </div>
-                                <?php endif; ?>
                             </div>
                             
                             <div class="form-group" id="payment_method_group" style="<?php echo ($formValues['payment_status'] ?? '') === 'paid' && !$isFreeEvent ? '' : 'display:none;'; ?>">
@@ -356,22 +292,6 @@ if ($ticket['attendee_type'] === 'student') {
                             </div>
                         </div>
                     </div>
-
-                    <!-- Regenerate Code -->
-                    <?php if (!$ticket['is_validated']): ?>
-                    <div style="margin-bottom:24px;padding:16px;background:var(--color-warning-bg);border:1px solid #fde68a;border-radius:var(--radius-sm);">
-                        <h3 style="font-size:14px;font-weight:700;color:#92400e;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;">
-                            ⚠️ Regenerate Ticket Code
-                        </h3>
-                        <p style="font-size:12px;color:#92400e;margin:0 0 10px 0;">
-                            This will generate a new UUID ticket code. The old code will become invalid.
-                        </p>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input type="checkbox" name="regenerate_code" value="1" style="width:auto;">
-                            <span style="font-size:13px;font-weight:600;color:#92400e;">Yes, generate a new ticket code</span>
-                        </label>
-                    </div>
-                    <?php endif; ?>
 
                     <div style="display:flex;gap:8px;padding-top:16px;border-top:1px solid var(--color-border);">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -410,19 +330,29 @@ if ($ticket['attendee_type'] === 'student') {
             </div>
 
             <!-- Other Tickets -->
-            <?php if (mysqli_num_rows($attendeeTickets) > 1): ?>
+            <?php if ($attendeeTickets && mysqli_num_rows($attendeeTickets) > 1): ?>
             <div class="card">
                 <div style="font-size:12px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
-                    Other Tickets
+                    Other Tickets (<?php echo mysqli_num_rows($attendeeTickets); ?>)
                 </div>
                 <?php 
                 mysqli_data_seek($attendeeTickets, 0);
                 while ($at = mysqli_fetch_assoc($attendeeTickets)): 
                 ?>
                     <div style="padding:8px 0;border-bottom:1px solid var(--color-border-light);<?php echo $at['ticket_id'] == $ticket_id ? 'background:var(--color-accent-bg);margin:0 -12px;padding:8px 12px;border-radius:4px;' : ''; ?>">
-                        <div style="font-size:12px;font-weight:500;"><?php echo h($at['event_name']); ?></div>
+                        <div style="font-size:12px;font-weight:500;<?php echo $at['ticket_id'] == $ticket_id ? 'color:var(--color-primary);' : ''; ?>">
+                            <?php echo h($at['event_name']); ?>
+                            <?php if ($at['ticket_id'] == $ticket_id): ?>
+                                <span style="font-size:10px;color:var(--color-accent-dark);">(current)</span>
+                            <?php endif; ?>
+                        </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-                            <span style="font-size:11px;color:var(--color-text-secondary);"><?php echo h($at['category_name']); ?></span>
+                            <span style="font-size:11px;color:var(--color-text-secondary);">
+                                <?php echo h($at['category_name']); ?>
+                                <?php if ($at['price'] > 0): ?>
+                                    · ₱<?php echo number_format($at['price'], 2); ?>
+                                <?php endif; ?>
+                            </span>
                             <span class="badge <?php echo getPaymentBadge($at['payment_status']); ?>" style="font-size:10px;">
                                 <?php echo ucfirst($at['payment_status']); ?>
                             </span>

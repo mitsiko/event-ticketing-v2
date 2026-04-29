@@ -7,7 +7,7 @@ $currentDate = date('Y-m-d');
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $typeFilter = isset($_GET['type']) ? trim($_GET['type']) : '';
 $sortBy = isset($_GET['sort']) ? trim($_GET['sort']) : 'date';
-$showAll = isset($_GET['show']) ? trim($_GET['show']) : '';
+$showFilter = isset($_GET['show']) ? trim($_GET['show']) : 'ticketed';
 
 $eventsQuery = "
     SELECT e.*, 
@@ -26,8 +26,10 @@ $eventsQuery = "
     AND e.status = 'upcoming'
 ";
 
-if ($showAll !== '1') {
+if ($showFilter === 'ticketed') {
     $eventsQuery .= " AND e.requires_ticket = 1";
+} elseif ($showFilter === 'unticketed') {
+    $eventsQuery .= " AND e.requires_ticket = 0";
 }
 
 if (!empty($search)) {
@@ -52,59 +54,163 @@ switch ($sortBy) {
 $events = mysqli_query($conn, $eventsQuery);
 $totalEvents = $events ? mysqli_num_rows($events) : 0;
 
-$countResult = mysqli_query($conn, "SELECT COUNT(*) as total FROM Event WHERE event_date >= '$currentDate' AND status = 'upcoming'");
-$totalAllUpcoming = $countResult ? mysqli_fetch_assoc($countResult)['total'] : 0;
+$countTicketed = mysqli_fetch_assoc(mysqli_query($conn, 
+    "SELECT COUNT(*) as total FROM Event WHERE event_date >= '$currentDate' AND status = 'upcoming' AND requires_ticket = 1"
+))['total'];
 
-$countTicketedResult = mysqli_query($conn, "SELECT COUNT(*) as total FROM Event WHERE event_date >= '$currentDate' AND status = 'upcoming' AND requires_ticket = 1");
-$totalTicketed = $countTicketedResult ? mysqli_fetch_assoc($countTicketedResult)['total'] : 0;
+$countUnticketed = mysqli_fetch_assoc(mysqli_query($conn, 
+    "SELECT COUNT(*) as total FROM Event WHERE event_date >= '$currentDate' AND status = 'upcoming' AND requires_ticket = 0"
+))['total'];
+
+$countAll = mysqli_fetch_assoc(mysqli_query($conn, 
+    "SELECT COUNT(*) as total FROM Event WHERE event_date >= '$currentDate' AND status = 'upcoming'"
+))['total'];
+
+if ($showFilter === 'ticketed') {
+    $pageTitle = 'EVENTS OPEN FOR REGISTRATION';
+} elseif ($showFilter === 'unticketed') {
+    $pageTitle = 'Free Entry Events';
+} else {
+    $pageTitle = 'All Upcoming Events';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Registration — University Events</title>
+    <title>Event Registration — UPHSD Molino</title>
     <link rel="stylesheet" href="<?php echo $basePath; ?>/assets/css/user-reg.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@200..800&family=Michroma&display=swap" rel="stylesheet">
+    <style>
+        /* Full-width welcome section with background image */
+        .welcome-section {
+            width: 100vw;
+            margin-left: calc(-50vw + 50%);
+            margin-right: calc(-50vw + 50%);
+            padding: 0;
+            position: relative;
+            background: linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.55)), 
+                        url('<?php echo $basePath; ?>/MOLINO-Campus-Facade-2.2.jpg') center/cover no-repeat;
+            min-height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .welcome-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+            width: 100%;
+        }
+        
+        .welcome-content .logo-img {
+            width: 80px;
+            height: auto;
+            margin-bottom: 16px;
+        }
+        
+        .welcome-content h2 {
+            font-family: 'Inter', serif;
+            font-size: 28px;
+            margin: 0 0 10px;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .welcome-content .subtitle {
+            font-size: 15px;
+            opacity: 0.9;
+            margin: 0 0 8px;
+            color: #f9be1b;
+            font-weight: 500;
+        }
+        
+        .welcome-content p {
+            font-size: 14px;
+            max-width: 650px;
+            margin: 0 auto 20px;
+            line-height: 1.6;
+            color: rgba(255,255,255,0.85);
+        }
+        
+        .welcome-highlights {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+        
+        .highlight-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .highlight-icon {
+            font-size: 18px;
+        }
+        
+        .filter-count { font-size: 11px; opacity: 0.8; font-weight: 500; }
+        
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+        .modal-overlay.show { display:flex; }
+        .lookup-card { background:#fdfbfc; border:1px solid #e5e5e5; border-radius:6px; padding:24px; width:90%; max-width:420px; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
+        .lookup-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .lookup-header h3 { margin:0; font-size:16px; color:#7e1416; font-family:'Anton',serif; }
+        .lookup-close { background:none; border:none; font-size:22px; cursor:pointer; color:#737373; padding:0 6px; line-height:1; }
+        .lookup-close:hover { color:#7e1416; }
+        .lookup-input { width:100%; padding:10px 12px; border:1px solid #e5e5e5; border-radius:4px; font-size:13px; box-sizing:border-box; }
+        .lookup-input:focus { outline:none; border-color:#7e1416; box-shadow:0 0 0 2px rgba(126,20,22,0.08); }
+        
+        @media (max-width:768px) {
+            .welcome-section { min-height: 260px; }
+            .welcome-content { padding: 30px 16px; }
+            .welcome-content h2 { font-size: 22px; }
+            .welcome-highlights { gap: 10px; }
+            .highlight-item { padding: 6px 14px; font-size: 12px; }
+        }
+    </style>
 </head>
 <body class="user-portal">
 
-    <!-- ===== HEADER (Full Width) ===== -->
     <header class="user-header">
         <div class="header-content">
             <div class="header-brand">
-                <div class="brand-icon">🎓</div>
+                <img src="<?php echo $basePath; ?>/uphsd-logo.png" alt="UPHSD Logo" style="width:40px;height:auto;">
                 <div>
-                    <h1>University Events</h1>
-                    <p>Browse and register for upcoming university events</p>
+                    <h1>UNIVERSITY OF PERPETUAL HELP SYSTEM DALTA</h1>
+                    <p>Molino Campus — Event Registration Portal</p>
                 </div>
             </div>
             <div class="header-actions">
-                <a href="<?php echo $basePath; ?>/modules/tickets/validate.php" class="btn-outline-light">🎟️ Validate Ticket</a>
                 <a href="<?php echo $basePath; ?>/" class="btn-outline-light">⚙️ Admin Portal</a>
             </div>
         </div>
     </header>
 
+    <!-- ===== FULL-WIDTH WELCOME SECTION ===== -->
+    <section class="welcome-section">
+        <div class="welcome-content">
+            <img src="<?php echo $basePath; ?>/uphsd-logo.png" alt="UPHSD Logo" class="logo-img">
+            <h2>Welcome, Perpetualites!</h2>
+            <p>Browse and register for upcoming events. Select an event below to secure your spot and receive your digital ticket.</p>
+        </div>
+    </section>
+
     <div class="user-container">
 
-        <!-- ===== STATS BAR ===== -->
-        <section class="stats-bar">
-            <div class="stat-item">
-                <span class="stat-number"><?php echo $totalAllUpcoming; ?></span>
-                <span class="stat-label">Total Upcoming</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number"><?php echo $totalTicketed; ?></span>
-                <span class="stat-label">Require Tickets</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">✓</span>
-                <span class="stat-label">Digital System</span>
-            </div>
-        </section>
-
-        <!-- ===== SEARCH & FILTER ===== -->
         <section class="search-section">
             <form method="GET" action="<?php echo $basePath; ?>/online-reg.php" class="search-form">
                 <input type="text" name="search" placeholder="Search events by name or keyword..." 
@@ -120,29 +226,33 @@ $totalTicketed = $countTicketedResult ? mysqli_fetch_assoc($countTicketedResult)
                     <option value="orientation" <?php echo $typeFilter==='orientation'?'selected':''; ?>>📋 Orientation</option>
                     <option value="other" <?php echo $typeFilter==='other'?'selected':''; ?>>📌 Other</option>
                 </select>
-                <?php if ($showAll === '1'): ?><input type="hidden" name="show" value="1"><?php endif; ?>
+                <input type="hidden" name="show" value="<?php echo $showFilter; ?>">
                 <button type="submit" class="btn-search">Search</button>
                 <?php if (!empty($search) || !empty($typeFilter)): ?>
-                    <a href="<?php echo $basePath; ?>/online-reg.php<?php echo $showAll==='1'?'?show=1':''; ?>" class="btn-reset">Clear</a>
+                    <a href="<?php echo $basePath; ?>/online-reg.php?show=<?php echo $showFilter; ?>" class="btn-reset">Clear</a>
                 <?php endif; ?>
             </form>
         </section>
 
-        <!-- ===== FILTER TOGGLE ===== -->
         <div class="filter-toggle-bar">
-            <a href="<?php echo $basePath; ?>/online-reg.php" class="filter-toggle-btn <?php echo $showAll!=='1'?'active':''; ?>">
-                🎟️ Ticketed Events
+            <a href="<?php echo $basePath; ?>/online-reg.php?show=ticketed" 
+               class="filter-toggle-btn <?php echo $showFilter==='ticketed'?'active':''; ?>">
+                🎟️ Ticketed Events <span class="filter-count">(<?php echo $countTicketed; ?>)</span>
             </a>
-            <a href="<?php echo $basePath; ?>/online-reg.php?show=1" class="filter-toggle-btn <?php echo $showAll==='1'?'active':''; ?>">
-                📋 All Events
+            <a href="<?php echo $basePath; ?>/online-reg.php?show=unticketed" 
+               class="filter-toggle-btn <?php echo $showFilter==='unticketed'?'active':''; ?>">
+                🎉 Free Entry <span class="filter-count">(<?php echo $countUnticketed; ?>)</span>
+            </a>
+            <a href="<?php echo $basePath; ?>/online-reg.php?show=all" 
+               class="filter-toggle-btn <?php echo $showFilter==='all'?'active':''; ?>">
+                📋 All Events <span class="filter-count">(<?php echo $countAll; ?>)</span>
             </a>
         </div>
 
-        <!-- ===== EVENTS GRID ===== -->
         <section class="events-section">
             <?php if ($events && $totalEvents > 0): ?>
                 <div class="events-header">
-                    <h2><?php echo $showAll==='1'?'All Upcoming Events':'Events Open for Registration'; ?></h2>
+                    <h2><?php echo $pageTitle; ?></h2>
                     <span class="events-count"><?php echo $totalEvents; ?> event<?php echo $totalEvents!==1?'s':''; ?></span>
                 </div>
                 <div class="events-grid">
@@ -238,51 +348,64 @@ $totalTicketed = $countTicketedResult ? mysqli_fetch_assoc($countTicketedResult)
             <?php else: ?>
                 <div class="no-events">
                     <div class="no-events-icon">📭</div>
-                    <h3 style="color:var(--user-primary);font-size:1.125rem;margin:0 0 0.5rem;">No Events Found</h3>
-                    <p style="color:var(--user-text-muted);">Try adjusting your filters or check back later.</p>
+                    <h3>No Events Found</h3>
+                    <p>Try adjusting your filters or check back later for new events.</p>
                 </div>
             <?php endif; ?>
         </section>
 
-        <!-- ===== FOOTER ===== -->
         <footer class="user-footer">
-            <p>University Event Management & Ticketing System</p>
-            <p class="footer-sub">© <?php echo date('Y'); ?> University Events. All rights reserved.</p>
+            <p>University of Perpetual Help System DALTA — Molino Campus</p>
+            <p class="footer-sub">© <?php echo date('Y'); ?> Event Management & Ticketing System. All rights reserved.</p>
         </footer>
     </div>
 
-    <!-- ===== QUICK LOOKUP FAB ===== -->
+    <!-- Quick Ticket Lookup FAB -->
     <div class="quick-lookup-fab" onclick="openLookup()" title="Quick Ticket Lookup">🎟️</div>
     
     <div id="lookup-modal" class="modal-overlay" onclick="if(event.target===this)closeLookup()">
         <div class="lookup-card">
             <div class="lookup-header">
-                <h3>Quick Ticket Lookup</h3>
+                <h3>QUICK TICKET LOOKUP</h3>
                 <button class="lookup-close" onclick="closeLookup()">&times;</button>
             </div>
-            <form action="<?php echo $basePath; ?>/modules/tickets/validate.php" method="GET">
-                <input type="text" name="code" placeholder="Paste your ticket code here..." class="lookup-input" required>
-                <button type="submit" class="btn-primary" style="width:100%;margin-top:10px;">Lookup Ticket</button>
+            <p style="font-size:13px;color:#525252;margin-bottom:12px;">Enter your ticket code to view your ticket and QR code.</p>
+            <form id="lookup-form" onsubmit="lookupTicket(event)">
+                <input type="text" id="lookup-code" placeholder="Paste your ticket code here..." class="lookup-input" required>
+                <button type="submit" class="btn-primary" style="width:100%;margin-top:10px;">View Ticket</button>
             </form>
+            <div id="lookup-error" style="display:none;margin-top:10px;color:#991b1b;font-size:12px;"></div>
         </div>
     </div>
 
-    <style>
-        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
-        .modal-overlay.show { display:flex; }
-        .lookup-card { background:var(--user-card-bg); border:1px solid var(--user-border); border-radius:var(--user-radius); padding:1.5rem; width:90%; max-width:400px; box-shadow:0 10px 25px rgba(0,0,0,0.15); }
-        .lookup-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
-        .lookup-header h3 { margin:0; font-size:1rem; color:var(--user-primary); }
-        .lookup-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--user-text-muted); padding:0 0.25rem; line-height:1; }
-        .lookup-close:hover { color:var(--user-primary); }
-        .lookup-input { width:100%; padding:0.625rem 0.75rem; border:1px solid var(--user-border); border-radius:var(--user-radius-xs); font-size:0.8125rem; box-sizing:border-box; }
-        .lookup-input:focus { outline:none; border-color:var(--user-primary); box-shadow:0 0 0 2px rgba(126,20,22,0.08); }
-    </style>
-
     <script>
-        function openLookup() { document.getElementById('lookup-modal').classList.add('show'); }
-        function closeLookup() { document.getElementById('lookup-modal').classList.remove('show'); }
-        document.addEventListener('keydown', function(e) { if(e.key==='Escape') closeLookup(); });
+        function openLookup() { 
+            document.getElementById('lookup-modal').classList.add('show');
+            document.getElementById('lookup-code').focus();
+            document.getElementById('lookup-error').style.display = 'none';
+        }
+        function closeLookup() { 
+            document.getElementById('lookup-modal').classList.remove('show');
+        }
+        
+        function lookupTicket(e) {
+            e.preventDefault();
+            var code = document.getElementById('lookup-code').value.trim();
+            var errorDiv = document.getElementById('lookup-error');
+            
+            if (!code) {
+                errorDiv.textContent = 'Please enter a ticket code.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            window.location.href = '<?php echo $basePath; ?>/ticket-lookup.php?code=' + encodeURIComponent(code);
+        }
+        
+        document.addEventListener('keydown', function(e) { 
+            if(e.key==='Escape') closeLookup(); 
+        });
+        
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.event-card').forEach(function(c, i) {
                 c.style.opacity = '0';
